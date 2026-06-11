@@ -14,9 +14,11 @@ link: https://youtu.be/sUv3-Pu4esg
 
 ### Estructura `datos_fib_t`
 **Propósito:** Agrupar los datos necesarios para que el hilo trabajador pueda generar la secuencia de Fibonacci.
+
 **Campos:**
 * `long long *fib`: puntero al arreglo compartido donde se almacenan los números de Fibonacci.
 * `int n`: cantidad de elementos de la secuencia a generar.
+  
 **Uso:** La estructura es inicializada por el hilo principal y su dirección es enviada al hilo trabajador mediante `pthread_create()`.
 
 ---
@@ -26,9 +28,12 @@ link: https://youtu.be/sUv3-Pu4esg
 void *generar_fibonacci(void *arg)
 ```
 **Propósito:** Generar los primeros N elementos de la secuencia de Fibonacci dentro del hilo trabajador.
+
 **Parámetros:**
 * `arg`: puntero genérico que contiene la dirección de una estructura `datos_fib_t`.
+
 **Proceso:**
+
 1. Convierte el argumento recibido al tipo `datos_fib_t`.
 2. Obtiene el tamaño de la secuencia y el arreglo compartido.
 3. Inicializa los dos primeros elementos de la secuencia.
@@ -45,10 +50,14 @@ void *generar_fibonacci(void *arg)
 int main(int argc, char *argv[])
 ```
 **Propósito:** Coordinar la ejecución general del programa.
+
 **Parámetros:**
+
 * `argc`: cantidad de argumentos recibidos.
 * `argv`: arreglo de cadenas que contiene los argumentos de entrada.
+  
 **Proceso:**
+
 1. Verifica que el usuario haya suministrado el valor N.
 2. Convierte el argumento recibido a entero.
 3. Valida que N sea mayor que cero.
@@ -59,7 +68,9 @@ int main(int argc, char *argv[])
 8. Imprime la secuencia generada.
 9. Libera la memoria reservada con `free()`.
 10. Finaliza el programa.
+
 **Valor de retorno:**
+
 * `0` si la ejecución fue exitosa.
 * `1` en caso de error de entrada o asignación de memoria.
 
@@ -69,8 +80,10 @@ int main(int argc, char *argv[])
 
 ## Problema: Desbordamiento numérico (Overflow)
 La secuencia de Fibonacci crece muy rápidamente. Debido a que los valores se almacenan utilizando variables de tipo `long long`, existe un límite máximo representable. A partir de aproximadamente F(93), los resultados exceden la capacidad de este tipo de dato y se produce un desbordamiento aritmético.
+
 ### Solución considerada
 Se evaluó implementar una validación para detectar el overflow y detener el cálculo cuando este ocurriera.
+
 ### Solución adoptada
 Finalmente se decidió no incorporar dicha validación.
 La razón es que el objetivo principal de la práctica era comparar el rendimiento de la implementación secuencial y la implementación con Pthreads para tamaños de entrada grandes, como N = 200000.
@@ -81,53 +94,68 @@ Por este motivo se mantuvo la implementación original, aceptando que los valore
 # 3. Pruebas realizadas
 
 ## Prueba 1: Generación correcta de la secuencia
+
 **Entrada:**
 ```bash
 ./fibonacci 15
 ```
+
 **Resultado esperado:**
 ```text
 0 1 1 2 3 5 8 13 21 34 55 89 144 233 377
 ```
+
 **Resultado obtenido:**
 La salida coincidió exactamente con la secuencia esperada.
+
 **Conclusión:**
 La implementación genera correctamente los primeros 15 términos de la secuencia de Fibonacci.
 
 ---
 
 ## Prueba 2: Validación de argumentos
+
 **Entrada:**
 ```bash
 ./fibonacci
 ```
+
 **Resultado esperado:**
 Mostrar mensaje de uso.
+
 **Resultado obtenido:**
 El programa informó correctamente la forma de utilización.
+
 **Conclusión:**
 La validación de parámetros funciona correctamente.
 ---
 
 ## Prueba 3: Validación de valores no válidos
+
 **Entrada:**
 ```bash
 ./fibonacci 0
 ```
+
 **Resultado esperado:**
 Mostrar mensaje indicando que N debe ser mayor que cero.
+
 **Resultado obtenido:**
 La validación se ejecutó correctamente.
+
 **Conclusión:**
 El programa maneja adecuadamente entradas inválidas.
 ---
 
 ## Prueba 4: Comparación de rendimiento
+
 **Configuración:**
 N = 200000
+
 **Resultados obtenidos:**
 * Tiempo secuencial: 0.004852 s
 * Tiempo Pthreads: 0.018617 s
+
 **Conclusión:**
 La versión secuencial resultó más rápida debido a que el problema no aprovecha paralelismo real y la implementación con hilos introduce sobrecarga adicional.
 ---
