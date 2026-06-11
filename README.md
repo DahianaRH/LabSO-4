@@ -8,6 +8,36 @@ Laboratorio 4 de Sistemas Operativos enfocado en API de Hilos
 ## Video de sustentación:
 link: https://youtu.be/sUv3-Pu4esg
 
+## 1. Cálculo de π (PI)
+
+### Programa Secuencial (`pi.c`)
+
+* **`double f(double x)`**
+    * **Descripción:** Evalúa numéricamente la función matemática $f(x) = \frac{4}{1 + x^2}$. Esta función representa la derivada de la función arcotangente, cuya integral en el intervalo $[0, 1]$ es exactamente igual a $\pi$.
+    * **Parámetros:** `x` (`double`) - El punto en el eje de las abscisas donde se evaluará la función.
+    * **Retorno:** (`double`) - El resultado de la evaluación.
+
+* **`double CalcPi(long n)`**
+    * **Descripción:** Realiza la aproximación del valor de Pi utilizando el método de integración numérica del punto medio (Suma de Riemann). Divide el intervalo $[0, 1]$ en `n` rectángulos y suma sus áreas.
+    * **Parámetros:** `n` (`long`) - El número total de subdivisiones o rectángulos para la aproximación.
+    * **Retorno:** (`double`) - El valor calculado de Pi.
+
+* **`int main(int argc, char *argv[])`**
+    * **Descripción:** Punto de entrada del programa ejecutable. Maneja los argumentos de la línea de comandos para configurar `n`, gestiona la medición del tiempo de ejecución mediante `gettimeofday`, invoca a `CalcPi` e imprime los resultados en un formato legible.
+
+### Programa Paralelo (`pi_p.c`)
+
+* **`double f(double x)`**
+    * **Descripción:** Misma funcionalidad que en la versión secuencial; calcula el valor de la curva en un punto `x`.
+
+* **`void *worker(void *arg)`**
+    * **Descripción:** Rutina ejecutada por cada hilo secundario de la biblioteca POSIX Threads (`pthreads`). Procesa un subconjunto contiguo de rectángulos definido por los límites `start` y `end` asignados. Calcula una suma local acumulada para evitar la contención de memoria.
+    * **Parámetros:** `arg` (`void *`) - Un puntero genérico que se transforma a `ThreadArg *`, el cual contiene el ID del hilo y sus rangos de iteración.
+    * **Retorno:** (`void *`) - Un puntero a una zona de memoria dinámica (`malloc`) que almacena el resultado local de tipo `double`.
+
+* **`int main(int argc, char *argv[])`**
+    * **Descripción:** Orquestador principal del algoritmo paralelo. Lee el número de hilos `T` y opcionalmente `n`. Divide la carga de trabajo equitativamente entre los hilos (repartiendo el residuo de la división). Crea los hilos con `pthread_create`, espera su finalización con `pthread_join`, unifica los resultados parciales (reducción), calcula el tiempo total transcurrido y libera los recursos asignados.
+
 ## 2. Generador de Secuencia de Fibonacci
 
 ### 2.1. Documentación de las funciones desarrolladas
@@ -78,17 +108,22 @@ int main(int argc, char *argv[])
 
 ### 2.2. Problemas presentados durante el desarrollo y soluciones adoptadas
 
-## Problema: Desbordamiento numérico (Overflow)
-La secuencia de Fibonacci crece muy rápidamente. Debido a que los valores se almacenan utilizando variables de tipo `long long`, existe un límite máximo representable. A partir de aproximadamente F(93), los resultados exceden la capacidad de este tipo de dato y se produce un desbordamiento aritmético.
+1.  **Desbordamiento numérico (Overflow):**
+    * *Problema:* La secuencia de Fibonacci crece muy rápidamente. Debido a que los valores se almacenan utilizando variables de tipo `long long`, existe un límite máximo representable. A partir de aproximadamente F(93), los resultados exceden la capacidad de este tipo de dato y se produce un desbordamiento aritmético.
+    * *Solución considerada:* Se evaluó implementar una validación para detectar el overflow y detener el cálculo cuando este ocurriera.
+    * *Solución adoptada:* Finalmente se decidió no incorporar dicha validación. La razón es que el objetivo principal de la práctica era comparar el rendimiento de la implementación secuencial y la implementación con Pthreads para tamaños de     entrada grandes, como N = 200000. Si el programa detuviera la ejecución al detectar el overflow, ambos algoritmos terminarían alrededor del término 93 y no procesarían la totalidad de los elementos solicitados, haciendo imposible realizar una   comparación significativa de tiempos. Por este motivo se mantuvo la implementación original, aceptando que los valores posteriores al desbordamiento no son matemáticamente correctos, pero permitiendo evaluar el comportamiento temporal de los algoritmos sobre una carga de trabajo grande.
 
-### Solución considerada
-Se evaluó implementar una validación para detectar el overflow y detener el cálculo cuando este ocurriera.
+2.  **Pérdida de datos por retorno incorrecto de variables locales (Stack vs Heap):**
+    * *Problema:* Inicialmente, al intentar devolver el resultado de la suma parcial desde el hilo (`worker`) usando la dirección de una variable local, el hilo principal (`main`) leía datos corruptos ("basura") debido a que la pila (stack) de la función del hilo se destruye al finalizar su ejecución.
+    * *Solución:* Se reservó memoria dinámicamente en el *Heap* mediante `malloc(sizeof(double))` dentro de cada hilo para almacenar el resultado. El hilo principal recibe este puntero a través de `pthread_join`, lee el valor de forma segura y posteriormente libera la memoria con `free()`.
 
-### Solución adoptada
-Finalmente se decidió no incorporar dicha validación.
-La razón es que el objetivo principal de la práctica era comparar el rendimiento de la implementación secuencial y la implementación con Pthreads para tamaños de entrada grandes, como N = 200000.
-Si el programa detuviera la ejecución al detectar el overflow, ambos algoritmos terminarían alrededor del término 93 y no procesarían la totalidad de los elementos solicitados, haciendo imposible realizar una comparación significativa de tiempos.
-Por este motivo se mantuvo la implementación original, aceptando que los valores posteriores al desbordamiento no son matemáticamente correctos, pero permitiendo evaluar el comportamiento temporal de los algoritmos sobre una carga de trabajo grande.
+3.  **Condiciones de carrera en variables compartidas (Race Conditions):**
+    * *Problema:* Si múltiples hilos intentaban actualizar de manera simultánea una única variable global `sum` en cada iteración del bucle, los accesos concurrentes provocaban inconsistencias, dando como resultado un valor erróneo de Pi y reduciendo drásticamente el rendimiento.
+    * *Solución:* Se rediseñó el algoritmo para que cada hilo trabaje con su propia variable privada `local_sum`. No existe comunicación ni interferencia entre hilos durante el bucle principal. La consolidación se realiza al final de forma secuencial en el hilo principal (patrón de Reducción).
+
+4.  **Desbalance de carga debido al residuo numérico (`n % T != 0`):**
+    * *Problema:* Cuando el número de iteraciones `n` no es perfectamente divisible por el número de hilos `T`, se corre el riesgo de ignorar las últimas iteraciones restantes o de sobrecargar injustamente al último hilo, afectando la precisión matemática o la eficiencia.
+    * *Solución:* Se implementó una técnica de distribución estática del residuo (`long rem = n % T`). Durante la inicialización de los rangos, los primeros hilos reciben un tamaño de bloque igual a `(n / T) + 1`, mientras que los hilos restantes reciben exactamente `n / T`. Esto cubre el 100% del espacio de iteración.
 
 ---
 # 3. Pruebas realizadas
@@ -160,6 +195,10 @@ N = 200000
 La versión secuencial resultó más rápida debido a que el problema no aprovecha paralelismo real y la implementación con hilos introduce sobrecarga adicional.
 ---
 
+* **Prueba de Consistencia Numérica:** Se ejecutaron de forma comparativa los ejecutables `pi_s` y `pi_p` bajo la misma configuración base (`n = 2000000000L`). Se comprobó que ambas alternativas retornaran exactamente el mismo valor de punto flotante de alta precisión (`PI = 3.141592653589793`), verificando que la lógica matemática no sufrió alteraciones por la descomposición paralela.
+* **Prueba de Rendimiento y Escalabilidad (Speedup):** Se validó el software paralelo `pi_p` incrementando paulatinamente el número de hilos (`T = 1, 2, 4, 8`). Se constató experimentalmente que el tiempo reportado en la línea `TIME` disminuía de forma inversamente proporcional al número de hilos (aceleración casi lineal) hasta alcanzar el límite físico de núcleos de procesamiento del hardware.
+* **Prueba de Robustez ante Entradas Inválidas:** Se evaluó el comportamiento del programa frente a errores del usuario, tales como omitir los parámetros requeridos o ingresar valores de hilos menores o iguales a cero (ej. `./pi_p 0`). El código interceptó adecuadamente estas anomalías, desplegando el mensaje instructivo en `stderr` y finalizando limpiamente con un código de salida `1`.
+
 # 4. Conclusiones
 1. La biblioteca Pthreads permite implementar concurrencia mediante la creación y administración de hilos dentro de un mismo proceso, compartiendo el mismo espacio de memoria.
 2. El uso de una estructura de datos para transferir información al hilo trabajador simplifica el envío de múltiples parámetros y mejora la organización del código.
@@ -168,3 +207,4 @@ La versión secuencial resultó más rápida debido a que el problema no aprovec
 5. El uso de hilos no garantiza una mejora de rendimiento. Cuando no existe paralelismo efectivo, la sobrecarga asociada a la creación y sincronización de hilos puede hacer que la solución concurrente sea más lenta que la secuencial.
 6. Los resultados experimentales mostraron que la versión con Pthreads fue aproximadamente 3.83 veces más lenta que la versión secuencial para N = 200000.
 7. El crecimiento acelerado de la secuencia de Fibonacci provoca desbordamiento en variables de tipo `long long`; sin embargo, mantener la implementación sin control de overflow permitió realizar una evaluación adecuada del rendimiento para tamaños de entrada grandes.
+
