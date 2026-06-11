@@ -6,7 +6,7 @@ Laboratorio 4 de Sistemas Operativos enfocado en API de Hilos
 - Sandy Dahiana Ruiz Higuita, CC. 1028031733, sandy.ruizh@udea.edu.co
 
 ## Video de sustentación:
-[link: ](https://youtu.be/sUv3-Pu4esg)
+link: https://youtu.be/sUv3-Pu4esg
 
 ## 2. Generador de Secuencia de Fibonacci
 
